@@ -1,6 +1,11 @@
 """
 Module registry for the Market Research Platform.
 This file handles registration of all modules with the main Flask app.
+
+Each module should:
+1. Have its own config.py file with module-specific settings
+2. Be independent from the global configuration
+3. Create a Blueprint for registration
 """
 
 def register_modules(app):

@@ -16,6 +16,12 @@ weekly_exports_bp = Blueprint(
 )
 
 # Import routes to register them with the blueprint
-from . import interactive_visual, report
+# Use a try-except to handle different import contexts
+try:
+    from . import interactive_visual, report
+except ImportError:
+    # This happens when the file is executed directly instead of imported
+    import interactive_visual
+    import report
 
 __version__ = '1.0.0'

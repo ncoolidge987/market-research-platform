@@ -15,13 +15,24 @@ import logging
 import sqlite3
 import json
 import os
-from config import Config
+
+# For direct execution, use absolute import
+# When imported as part of package, use relative import
+try:
+    # Try relative import first (for when imported as part of package)
+    from .config import WeeklyExportConfig
+except ImportError:
+    # Fall back to absolute import for direct script execution
+    import sys
+    import os
+    sys.path.insert(0, os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
+    from modules.weekly_export_sales.config import WeeklyExportConfig
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
-    filename='modules/weekly_export_sales/data/data_collector.log'
+    filename=WeeklyExportConfig.DATA_LOG_PATH
 )
 
 @dataclass
@@ -35,12 +46,12 @@ class APIKey:
         self.last_used = time.time()
 
 class ESRDataCollector:
-    def __init__(self, api_keys: List[str], rate_limit_threshold: int = 50):
+    def __init__(self, api_keys: List[str], rate_limit_threshold: int = WeeklyExportConfig.RATE_LIMIT_THRESHOLD):
         self.api_keys = deque([APIKey(key) for key in api_keys])
         self.current_key = self.api_keys[0]
         self.base_url = "https://api.fas.usda.gov/api/esr"
         self.rate_limit_threshold = rate_limit_threshold
-        self.retry_delay = 5
+        self.retry_delay = WeeklyExportConfig.RETRY_DELAY
         
     def _get_headers(self) -> Dict[str, str]:
         return {
@@ -69,11 +80,7 @@ class ESRDataCollector:
     def _check_quota(self, api_key: APIKey) -> int:
         try:
             headers = {'X-Api-Key': api_key.key, "accept": "application/json"}
-            proxies = {
-                    'http': 'proxy.server:3128',
-                    'https': 'proxy.server:3128'
-                }
-            response = requests.get(f"{self.base_url}/regions", headers=headers, timeout=30, proxies=proxies)
+            response = requests.get(f"{self.base_url}/regions", headers=headers, timeout=30)
             response.raise_for_status()
             remaining = int(response.headers.get('X-Ratelimit-Remaining', 0))
             api_key.update_quota(remaining)
@@ -94,11 +101,8 @@ class ESRDataCollector:
         while retries < max_retries:
             try:
                 logging.info(f"Request attempt {retries + 1}/{max_retries} to {url}")
-                proxies = {
-                    'http': 'proxy.server:3128',
-                    'https': 'proxy.server:3128'
-                }
-                response = requests.get(url, headers=self._get_headers(), timeout=120, proxies=proxies)
+
+                response = requests.get(url, headers=self._get_headers(), timeout=120)
                 
                 if response.status_code == 429:
                     self._rotate_api_key()
@@ -278,7 +282,7 @@ class ExportDataManager:
     """Data manager class for export sales data handling database operations."""
     
     def __init__(self, db_path=None):
-        self.db_path = db_path or Config.ESR_DB_PATH
+        self.db_path = db_path or WeeklyExportConfig.DB_PATH
         self._ensure_db_directory()
         self.metrics = {
             'weeklyExports': 'Weekly Exports',
@@ -631,23 +635,16 @@ class ExportDataManager:
 
         return result
 
+
 def collect_data():
     """Run the data collection process."""
-    api_keys = [
-        "sXXbup7bXhySZZJBQv5VmmugtL3iW1UoRyjfeHJX",
-        "O3NXAWRBr9DTb9EzpgzXcfB0FDhUWnyWSMZaT21u",
-        "7eZV4w04Gpwd44zqOKoB92Is9nLwNdtTqqThNqPq",
-        "P5cCtban45muGHzXVI9dgrdpnyCuQ1ogyJioOlgo",
-        "H6UpwAmkElhx1Vjv3N3f0aBcBGND5KekrBTEXoFP"
-    ]
+    # Ensure data directories exist
+    WeeklyExportConfig.ensure_directories()
     
-    # Ensure data directory exists
-    os.makedirs(os.path.dirname(Config.ESR_DB_PATH), exist_ok=True)
-    
-    collector = ESRDataCollector(api_keys)
+    collector = ESRDataCollector(WeeklyExportConfig.API_KEYS)
     
     try:
-        conn = sqlite3.connect(Config.ESR_DB_PATH)
+        conn = sqlite3.connect(WeeklyExportConfig.DB_PATH)
         cursor = conn.cursor()
         
         # Create releases tracking table

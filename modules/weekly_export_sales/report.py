@@ -6,12 +6,25 @@ Defines routes and functions for generating export reports.
 import logging
 import json
 from flask import render_template, request, jsonify
-from . import weekly_exports_bp
-from .data_load import ExportDataManager
-from config import Config
+
+# For direct execution, use absolute import
+# When imported as part of package, use relative import
+try:
+    # Try relative import first (for when imported as part of package)
+    from . import weekly_exports_bp
+    from .data_load import ExportDataManager
+    from .config import WeeklyExportConfig
+except ImportError:
+    # Fall back to absolute import for direct script execution
+    import sys
+    import os
+    sys.path.insert(0, os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
+    from modules.weekly_export_sales import weekly_exports_bp
+    from modules.weekly_export_sales.data_load import ExportDataManager
+    from modules.weekly_export_sales.config import WeeklyExportConfig
 
 # Initialize the export data manager
-data_manager = ExportDataManager(Config.ESR_DB_PATH)
+data_manager = ExportDataManager(WeeklyExportConfig.DB_PATH)
 
 @weekly_exports_bp.route('/report')
 def export_report():
@@ -93,3 +106,8 @@ def generate_report(commodity_code, report_type='weekly'):
     except Exception as e:
         logging.error(f"Error generating report: {str(e)}")
         return {'error': str(e)}
+
+# For running the file directly (testing purposes)
+if __name__ == "__main__":
+    print("This module is not meant to be run directly.")
+    print("It contains Flask routes that need to be registered with a Flask application.")

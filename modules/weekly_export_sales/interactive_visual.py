@@ -9,12 +9,25 @@ import pandas as pd
 import plotly
 import plotly.graph_objects as go
 from flask import render_template, request, jsonify
-from . import weekly_exports_bp
-from .data_load import ExportDataManager
-from config import Config
+
+# For direct execution, use absolute import
+# When imported as part of package, use relative import
+try:
+    # Try relative import first (for when imported as part of package)
+    from . import weekly_exports_bp
+    from .data_load import ExportDataManager
+    from .config import WeeklyExportConfig
+except ImportError:
+    # Fall back to absolute import for direct script execution
+    import sys
+    import os
+    sys.path.insert(0, os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
+    from modules.weekly_export_sales import weekly_exports_bp
+    from modules.weekly_export_sales.data_load import ExportDataManager
+    from modules.weekly_export_sales.config import WeeklyExportConfig
 
 # Initialize the export data manager
-data_manager = ExportDataManager(Config.ESR_DB_PATH)
+data_manager = ExportDataManager(WeeklyExportConfig.DB_PATH)
 
 @weekly_exports_bp.route('/')
 def weekly_exports():
@@ -282,3 +295,8 @@ def create_my_comparison_plot(data, metric, metric_name, units, start_year, end_
         margin=dict(l=50, r=150, t=100, b=50)
     )
     return fig
+
+# For running the file directly (testing purposes)
+if __name__ == "__main__":
+    print("This module is not meant to be run directly.")
+    print("It contains Flask routes that need to be registered with a Flask application.")
